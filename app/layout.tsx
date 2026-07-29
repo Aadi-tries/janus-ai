@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Janus — AI operations for modern teams",
+  title: "Janus — AI decision challenger",
   description:
-    "Janus helps teams design, evaluate, and ship reliable AI workflows from one focused workspace.",
+    "Janus questions assumptions, stress-tests plans, and helps teams make better decisions.",
 };
 
 export default function RootLayout({
