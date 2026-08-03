@@ -1,6 +1,6 @@
 import { Button } from "@/components/button";
 import { Container } from "@/components/container";
-import { Activity, ShieldAlert, Zap, Terminal, Cpu, Check, Layers, AlertCircle, ArrowRight } from "lucide-react";
+import { Activity, ShieldAlert, Zap, Terminal, Check } from "lucide-react";
 
 const features = [
   {
@@ -110,10 +110,10 @@ function Hero() {
             </div>
             {/* Screen content */}
             <div className="p-6 font-mono text-xs text-zinc-400 space-y-4 min-h-[220px]">
-              <div className="text-zinc-500">// CHALLENGER PROFILE LOADED: SYSTEM CHALLENGER #4 (INVESTOR)</div>
-              <div className="text-red-400 font-semibold">&gt; "You state you have a 12-month runway but haven't factored in the new licensing tariffs. Why should I assume you won't be insolvent by Q3? Defend your numbers."</div>
-              <div className="pl-4 border-l-2 border-zinc-800 text-zinc-500">// USER DEFENSE: "We modeled a 15% increase in supply chain buffer to absorb tariff spikes."</div>
-              <div className="text-purple-400 font-semibold">&gt; SYSTEM REALITY ATTACK GENERATED: "Catastrophic event: Your primary supplier shifts to exclusive contract. Lead time multiplies by 4x. What is your move?"</div>
+              <div className="text-zinc-500">{"// CHALLENGER PROFILE LOADED: SYSTEM CHALLENGER #4 (INVESTOR)"}</div>
+              <div className="text-red-400 font-semibold">&gt; &quot;You state you have a 12-month runway but haven&apos;t factored in the new licensing tariffs. Why should I assume you won&apos;t be insolvent by Q3? Defend your numbers.&quot;</div>
+              <div className="pl-4 border-l-2 border-zinc-800 text-zinc-500">{"// USER DEFENSE: \"We modeled a 15% increase in supply chain buffer to absorb tariff spikes.\""}</div>
+              <div className="text-purple-400 font-semibold">&gt; SYSTEM REALITY ATTACK GENERATED: &quot;Catastrophic event: Your primary supplier shifts to exclusive contract. Lead time multiplies by 4x. What is your move?&quot;</div>
             </div>
           </div>
         </div>

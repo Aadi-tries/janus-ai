@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Target, UploadCloud, TrendingUp, Users, Swords, ShieldAlert, Brain, Check, Shield } from "lucide-react";
+import { ArrowLeft, Loader2, Target, UploadCloud, TrendingUp, Users, Swords, ShieldAlert, Brain, Check } from "lucide-react";
 import Link from "next/link";
 import { AGENTS, AgentId } from "@/constants/agents";
 

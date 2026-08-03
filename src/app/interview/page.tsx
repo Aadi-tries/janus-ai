@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Send, AlertTriangle, FileText, UploadCloud, ArrowLeft, Users, TrendingUp, Swords, ShieldAlert, Brain, Check, ChevronUp, Terminal, Activity, RefreshCw } from "lucide-react";
+import { Loader2, Send, AlertTriangle, FileText, UploadCloud, ArrowLeft, Users, TrendingUp, Swords, ShieldAlert, Brain, Check, ChevronUp } from "lucide-react";
 import { AGENTS, AGENT_MAP, AgentId } from "@/constants/agents";
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -64,7 +64,7 @@ type Message = {
   type?: "question" | "reality_attack";
 };
 
-export default function InterviewPage() {
+function InterviewPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const decisionId = searchParams.get("id");
@@ -122,13 +122,70 @@ export default function InterviewPage() {
     if (chatFileInputRef.current) chatFileInputRef.current.value = "";
   };
 
+  const saveMessageToDb = useCallback(async (role: string, content: string, persona?: string, type?: string) => {
+    if (!decisionId) return;
+    try {
+      await fetch(`/api/decisions/${decisionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, content, persona, type }),
+      });
+    } catch (e) {
+      console.error("Failed to save message", e);
+    }
+  }, [decisionId]);
+
+  const fetchNextQuestion = useCallback(async (history: Message[], currentObj = objective, currentCtx = context, agents: string[] | null = selectedAgents) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ objective: currentObj, context: currentCtx, history, selectedAgents: agents }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to generate question. Check your API key quota.");
+      }
+
+      if (data.type === "reality_attack") {
+        setIsRealityAttack(true);
+      }
+
+      const newMessage = {
+        role: "assistant" as const,
+        content: data.message,
+        persona: data.persona,
+        type: data.type,
+      };
+
+      setMessages((prev) => [...prev, newMessage]);
+      await saveMessageToDb(newMessage.role, newMessage.content, newMessage.persona, newMessage.type);
+    } catch (error) {
+      console.error("Failed to fetch next question:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `System Error: ${message}. Please verify your OpenAI API key has available quota.`,
+          persona: "System Error",
+          type: "question",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [context, objective, saveMessageToDb, selectedAgents]);
+
   // Initial load
   useEffect(() => {
     if (!decisionId) {
       router.push("/dashboard");
       return;
     }
-    
+
     async function fetchDecision() {
       try {
         const res = await fetch(`/api/decisions/${decisionId}`);
@@ -140,7 +197,7 @@ export default function InterviewPage() {
             ? data.selectedAgents.split(",")
             : null;
           setSelectedAgents(agents);
-          
+
           if (data.messages && data.messages.length > 0) {
             setMessages(data.messages);
             if (data.messages[data.messages.length - 1].type === "reality_attack") {
@@ -158,69 +215,13 @@ export default function InterviewPage() {
         console.error("Failed to load decision", e);
       }
     }
-    
+
     fetchDecision();
-  }, [decisionId, router]);
+  }, [decisionId, router, fetchNextQuestion]);
 
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  async function saveMessageToDb(role: string, content: string, persona?: string, type?: string) {
-    if (!decisionId) return;
-    try {
-      await fetch(`/api/decisions/${decisionId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, content, persona, type }),
-      });
-    } catch (e) {
-      console.error("Failed to save message", e);
-    }
-  }
-
-  async function fetchNextQuestion(history: Message[], currentObj = objective, currentCtx = context, agents: string[] | null = selectedAgents) {
-    setIsLoading(true);
-    try {
-      const res = await fetch("/api/interview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ objective: currentObj, context: currentCtx, history, selectedAgents: agents }),
-      });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate question. Check your API key quota.");
-      }
-      
-      if (data.type === "reality_attack") {
-        setIsRealityAttack(true);
-      }
-
-      const newMessage = {
-        role: "assistant" as const,
-        content: data.message,
-        persona: data.persona,
-        type: data.type,
-      };
-
-      setMessages((prev) => [...prev, newMessage]);
-      await saveMessageToDb(newMessage.role, newMessage.content, newMessage.persona, newMessage.type);
-    } catch (error: any) {
-      console.error("Failed to fetch next question:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `System Error: ${error.message}. Please verify your OpenAI API key has available quota.`,
-          persona: "System Error",
-          type: "question",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -274,7 +275,7 @@ export default function InterviewPage() {
                 <AlertTriangle className="size-3.5" /> CRITICAL_ALERT
               </span>
             )}
-            <button 
+            <button
               onClick={handleGenerateReport}
               disabled={isLoading || messages.length === 0}
               className="inline-flex items-center gap-2 rounded bg-gradient-to-r from-red-600 to-purple-600 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-white transition hover:scale-105 shadow-[0_0_15px_rgba(239,68,68,0.25)] disabled:opacity-40 border border-red-500/20"
@@ -329,7 +330,7 @@ export default function InterviewPage() {
             {messages.map((msg, idx) => {
               const isUser = msg.role === "user";
               const isAttack = msg.type === "reality_attack";
-              
+
               // Get persona details for styled header
               const matchedAgent = AGENTS.find(a => a.name === msg.persona);
               const styles = matchedAgent ? COLOR_STYLES[matchedAgent.color] : null;
@@ -344,7 +345,7 @@ export default function InterviewPage() {
                       <span className={`size-1.5 rounded-full ${isAttack ? "bg-red-500" : styles?.dot ?? "bg-zinc-500"} animate-pulse`} />
                     </div>
                   )}
-                  
+
                   <div
                     className={`p-5 rounded-xl text-sm leading-relaxed border relative shadow-md transition-all ${
                       isUser
@@ -362,7 +363,7 @@ export default function InterviewPage() {
                 </div>
               );
             })}
-            
+
             {isLoading && (
               <div className="flex flex-col items-start w-full">
                 <span className="text-[10px] font-bold uppercase tracking-widest mb-2 text-zinc-600 font-mono animate-pulse">
@@ -504,5 +505,13 @@ export default function InterviewPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function InterviewPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center text-zinc-100">Loading...</div>}>
+      <InterviewPageContent />
+    </Suspense>
   );
 }

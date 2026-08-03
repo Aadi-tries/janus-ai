@@ -15,9 +15,8 @@ export async function getStructuredResponse<T>(
   model: string = "gemini-2.5-flash"
 ): Promise<T | null> {
   try {
-    // We override the model to gemini-2.5-flash
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model,
       contents: userMessage,
       config: {
         systemInstruction: systemPrompt,

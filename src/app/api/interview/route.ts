@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { getStructuredResponse } from "@/lib/openai";
 import { AGENTS, AGENT_MAP, AgentId } from "@/constants/agents";
 
+type ConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
+  persona?: string;
+};
+
 // Build the persona list section of the prompt based on selected agents
 function buildPersonaList(selectedAgents?: AgentId[] | null): string {
   const agents = selectedAgents && selectedAgents.length > 0
@@ -65,7 +71,7 @@ INSTRUCTIONS:
   "message": "<your question or scenario>"
 }`;
 
-    const userMessage = `Conversation history:\n${history.map((m: any) => `[${m.role === 'user' ? 'User' : m.persona}]: ${m.content}`).join('\n')}\n\nBased on this history, what is your next move?`;
+    const userMessage = `Conversation history:\n${(history as ConversationMessage[]).map((m) => `[${m.role === 'user' ? 'User' : m.persona}]: ${m.content}`).join('\n')}\n\nBased on this history, what is your next move?`;
 
     type InterviewResponse = {
       type: "question" | "reality_attack";

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2, ArrowLeft, Download, ShieldAlert, CheckCircle2, AlertTriangle, Lightbulb } from "lucide-react";
 import Link from "next/link";
 
@@ -15,8 +15,7 @@ type ReportData = {
   recommendations: string[];
 };
 
-export default function ReportPage() {
-  const router = useRouter();
+function ReportPageContent() {
   const searchParams = useSearchParams();
   const [report, setReport] = useState<ReportData | null>(null);
   const decisionId = searchParams.get("id");
@@ -65,7 +64,7 @@ export default function ReportPage() {
     }
 
     generateReport();
-  }, []);
+  }, [decisionId]);
 
   if (isLoading) {
     return (
@@ -204,5 +203,13 @@ export default function ReportPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center text-zinc-100">Loading...</div>}>
+      <ReportPageContent />
+    </Suspense>
   );
 }

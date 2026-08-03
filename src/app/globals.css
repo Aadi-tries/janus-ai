@@ -6,8 +6,8 @@
   --muted: #a1a1aa;
   --border-neon: rgba(239, 68, 68, 0.15);
   --border-neon-glow: rgba(239, 68, 68, 0.4);
-  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
-  --font-title: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-title: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
 * {

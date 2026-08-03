@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getStructuredResponse } from "@/lib/openai";
 
+type ConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
+  persona?: string;
+};
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -28,7 +34,7 @@ INSTRUCTIONS:
   "recommendations": string[]
 }`;
 
-    const userMessage = `Conversation history:\n${history.map((m: any) => `[${m.role === 'user' ? 'User' : m.persona || 'Janus'}]: ${m.content}`).join('\n')}\n\nGenerate the final decision report based on this transcript.`;
+    const userMessage = `Conversation history:\n${(history as ConversationMessage[]).map((m) => `[${m.role === 'user' ? 'User' : m.persona || 'Janus'}]: ${m.content}`).join('\n')}\n\nGenerate the final decision report based on this transcript.`;
 
     type ReportResponse = {
       readinessScore: number;
