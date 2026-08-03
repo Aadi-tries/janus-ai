@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStructuredResponse } from "@/lib/openai";
+import { normalizeHistory, normalizeOptionalText, normalizeRequiredText, normalizeSelectedAgents } from "@/lib/validation";
 import { AGENTS, AGENT_MAP, AgentId } from "@/constants/agents";
 
 // Build the persona list section of the prompt based on selected agents
@@ -24,7 +25,14 @@ function buildPersonaEnum(selectedAgents?: AgentId[] | null): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { objective, context, history, selectedAgents } = body;
+    const objective = normalizeRequiredText(body.objective);
+    const context = normalizeOptionalText(body.context);
+    const history = normalizeHistory(body.history);
+    const selectedAgents = normalizeSelectedAgents(body.selectedAgents);
+
+    if (!objective) {
+      return NextResponse.json({ error: "Objective is required" }, { status: 400 });
+    }
 
     const personaList = buildPersonaList(selectedAgents);
     const personaEnum = buildPersonaEnum(selectedAgents);
@@ -65,7 +73,7 @@ INSTRUCTIONS:
   "message": "<your question or scenario>"
 }`;
 
-    const userMessage = `Conversation history:\n${history.map((m: any) => `[${m.role === 'user' ? 'User' : m.persona}]: ${m.content}`).join('\n')}\n\nBased on this history, what is your next move?`;
+    const userMessage = `Conversation history:\n${history.map((m) => `[${m.role === 'user' ? 'User' : m.persona}]: ${m.content}`).join('\n')}\n\nBased on this history, what is your next move?`;
 
     type InterviewResponse = {
       type: "question" | "reality_attack";

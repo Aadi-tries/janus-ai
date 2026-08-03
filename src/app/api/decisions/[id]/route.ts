@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { isDecisionStatus } from "@/lib/validation";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -30,6 +31,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { id } = await context.params;
     const body = await request.json();
     const { status } = body;
+
+    if (!isDecisionStatus(status)) {
+      return NextResponse.json({ error: "Invalid decision status" }, { status: 400 });
+    }
 
     const decision = await prisma.decision.update({
       where: { id },

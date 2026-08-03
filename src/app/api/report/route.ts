@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { getStructuredResponse } from "@/lib/openai";
+import { normalizeHistory, normalizeOptionalText, normalizeRequiredText } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { objective, context, history } = body;
+    const objective = normalizeRequiredText(body.objective);
+    const context = normalizeOptionalText(body.context);
+    const history = normalizeHistory(body.history);
+
+    if (!objective) {
+      return NextResponse.json({ error: "Objective is required" }, { status: 400 });
+    }
 
     const systemPrompt = `You are JANUS, an AI decision challenger. You have just completed a rigorous cross-examination and reality attack on the user's decision.
 Your task now is to generate a brutal, objective, and highly professional Decision Readiness Report.
@@ -28,7 +35,7 @@ INSTRUCTIONS:
   "recommendations": string[]
 }`;
 
-    const userMessage = `Conversation history:\n${history.map((m: any) => `[${m.role === 'user' ? 'User' : m.persona || 'Janus'}]: ${m.content}`).join('\n')}\n\nGenerate the final decision report based on this transcript.`;
+    const userMessage = `Conversation history:\n${history.map((m) => `[${m.role === 'user' ? 'User' : m.persona || 'Janus'}]: ${m.content}`).join('\n')}\n\nGenerate the final decision report based on this transcript.`;
 
     type ReportResponse = {
       readinessScore: number;

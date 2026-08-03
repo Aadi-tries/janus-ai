@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normalizeOptionalText, normalizeRequiredText, normalizeSelectedAgents } from "@/lib/validation";
 
 export async function GET() {
   try {
@@ -16,7 +17,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { objective, context, selectedAgents } = body;
+    const objective = normalizeRequiredText(body.objective);
+    const context = normalizeOptionalText(body.context);
+    const selectedAgents = normalizeSelectedAgents(body.selectedAgents);
 
     if (!objective) {
       return NextResponse.json({ error: "Objective is required" }, { status: 400 });
@@ -25,10 +28,8 @@ export async function POST(request: Request) {
     const decision = await prisma.decision.create({
       data: {
         objective,
-        context: context || "",
-        selectedAgents: Array.isArray(selectedAgents) && selectedAgents.length > 0
-          ? selectedAgents.join(",")
-          : null,
+        context,
+        selectedAgents: selectedAgents ? selectedAgents.join(",") : null,
         status: "in_progress",
       },
     });

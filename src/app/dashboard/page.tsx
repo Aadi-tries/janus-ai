@@ -4,8 +4,15 @@ import Link from "next/link";
 import { PlusCircle, Activity, CheckCircle, Clock, Play, Server, ArrowRight, ShieldAlert, Cpu } from "lucide-react";
 import { useEffect, useState } from "react";
 
+type DashboardDecision = {
+  id: string;
+  objective: string;
+  createdAt: string;
+  status: "draft" | "in_progress" | "completed" | "orchestrating" | "analyzing" | "failed";
+};
+
 export default function DashboardPage() {
-  const [decisions, setDecisions] = useState<any[]>([]);
+  const [decisions, setDecisions] = useState<DashboardDecision[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
