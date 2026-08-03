@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Decision {
+  id             String    @id @default(uuid())
+  objective      String
+  context        String?
+  selectedAgents String?   // comma-separated agent IDs, null means "all"
+  status         String    @default("draft") // draft, in_progress, completed
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  messages       Message[]
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  role       String   // "user" or "assistant"
+  content    String
+  persona    String?  // for assistant messages
+  type       String?  // "question" or "reality_attack"
+  createdAt  DateTime @default(now())
+  
+  decisionId String
+  decision   Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+}

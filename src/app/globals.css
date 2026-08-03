@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+:root {
+  --background: #070709;
+  --foreground: #f4f4f5;
+  --muted: #a1a1aa;
+  --border-neon: rgba(239, 68, 68, 0.15);
+  --border-neon-glow: rgba(239, 68, 68, 0.4);
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-title: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Cyber Grid Background */
+.cyber-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -20;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: center top;
+}
+
+.cyber-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 25%, transparent 10%, #070709 85%);
+  pointer-events: none;
+}
+
+/* Neon Glassmorphism Panel */
+.glass-panel {
+  background: rgba(15, 15, 22, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-panel-neon {
+  background: rgba(15, 15, 22, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel-neon:hover {
+  border-color: rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 40px rgba(239, 68, 68, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Neon Text Glow */
+.text-glow-red {
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 12px rgba(139, 92, 246, 0.5);
+}
+
+/* Glowing dot overlay */
+.dot-matrix {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 0);
+  background-size: 16px 16px;
+}
+
+/* Cyber Scanline effect */
+.bg-scanlines {
+  background-image: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0) 50%,
+    rgba(220, 38, 38, 0.04) 50%,
+    rgba(220, 38, 38, 0.04)
+  );
+  background-size: 100% 4px;
+  animation: scanlines 20s linear infinite;
+}
+
+@keyframes scanlines {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 100vh; }
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); text-shadow: -2px 0 rgba(239,68,68,0.7), 2px 0 rgba(6,182,212,0.7); }
+  20% { transform: translate(-1px, 1px); text-shadow: -1px 0 rgba(239,68,68,0.7), 1px 0 rgba(6,182,212,0.7); }
+  40% { transform: translate(1px, -1px); text-shadow: 1px 0 rgba(239,68,68,0.7), -1px 0 rgba(6,182,212,0.7); }
+  60% { transform: translate(-1px, 1px); text-shadow: -2px 0 rgba(239,68,68,0.7), 2px 0 rgba(6,182,212,0.7); }
+  80% { transform: translate(1px, -1px); text-shadow: 1px 0 rgba(239,68,68,0.7), -1px 0 rgba(6,182,212,0.7); }
+  100% { transform: translate(0); text-shadow: -2px 0 rgba(239,68,68,0.7), 2px 0 rgba(6,182,212,0.7); }
+}
+
+.animate-glitch {
+  animation: glitch 0.25s infinite;
+}
+
+/* Heading font helper */
+.font-title {
+  font-family: var(--font-title);
+}
+
+/* Custom interactive cyber buttons */
+.btn-cyber {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-cyber::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.btn-cyber:hover::after {
+  transform: translateX(100%);
+}
