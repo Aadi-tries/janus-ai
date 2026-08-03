@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Send, AlertTriangle, FileText, UploadCloud, ArrowLeft, Users, TrendingUp, Swords, ShieldAlert, Brain, Check, ChevronUp, Terminal, Activity, RefreshCw } from "lucide-react";
@@ -64,7 +64,7 @@ type Message = {
   type?: "question" | "reality_attack";
 };
 
-export default function InterviewPage() {
+function InterviewContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const decisionId = searchParams.get("id");
@@ -77,6 +77,7 @@ export default function InterviewPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isRealityAttack, setIsRealityAttack] = useState(false);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
   const chatFileInputRef = useRef<HTMLInputElement>(null);
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -140,115 +141,137 @@ export default function InterviewPage() {
             ? data.selectedAgents.split(",")
             : null;
           setSelectedAgents(agents);
+          setMessages(data.messages);
           
-          if (data.messages && data.messages.length > 0) {
-            setMessages(data.messages);
-            if (data.messages[data.messages.length - 1].type === "reality_attack") {
-              setIsRealityAttack(true);
-            }
-          } else {
-            // First time loading, fetch the first question
-            const fetchAgents = data.selectedAgents
-              ? data.selectedAgents.split(",")
-              : null;
-            fetchNextQuestion([], data.objective, data.context || "", fetchAgents);
+          // Set reality attack state if last assistant message was a reality attack
+          const lastMsg = data.messages[data.messages.length - 1];
+          if (lastMsg && lastMsg.role === "assistant" && lastMsg.type === "reality_attack") {
+            setIsRealityAttack(true);
           }
         }
       } catch (e) {
-        console.error("Failed to load decision", e);
+        console.error("Failed to fetch decision", e);
       }
     }
-    
     fetchDecision();
   }, [decisionId, router]);
 
+  // Scroll to bottom
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function saveMessageToDb(role: string, content: string, persona?: string, type?: string) {
-    if (!decisionId) return;
-    try {
-      await fetch(`/api/decisions/${decisionId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, content, persona, type }),
-      });
-    } catch (e) {
-      console.error("Failed to save message", e);
-    }
-  }
-
-  async function fetchNextQuestion(history: Message[], currentObj = objective, currentCtx = context, agents: string[] | null = selectedAgents) {
+  async function fetchNextQuestion(currentHistory: Message[]) {
     setIsLoading(true);
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ objective: currentObj, context: currentCtx, history, selectedAgents: agents }),
+        body: JSON.stringify({
+          objective,
+          context,
+          history: currentHistory,
+          selectedAgents,
+        }),
       });
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to generate question. Check your API key quota.");
-      }
-      
-      if (data.type === "reality_attack") {
-        setIsRealityAttack(true);
-      }
 
-      const newMessage = {
-        role: "assistant" as const,
-        content: data.message,
-        persona: data.persona,
-        type: data.type,
-      };
+      if (res.ok) {
+        const question = await res.json();
+        
+        // Save question to database
+        const saveRes = await fetch(`/api/decisions/${decisionId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: "assistant",
+            content: question.message,
+            persona: question.persona,
+            type: question.type,
+          }),
+        });
 
-      setMessages((prev) => [...prev, newMessage]);
-      await saveMessageToDb(newMessage.role, newMessage.content, newMessage.persona, newMessage.type);
-    } catch (error: any) {
-      console.error("Failed to fetch next question:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `System Error: ${error.message}. Please verify your OpenAI API key has available quota.`,
-          persona: "System Error",
-          type: "question",
-        },
-      ]);
+        if (saveRes.ok) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: question.message,
+              persona: question.persona,
+              type: question.type,
+            },
+          ]);
+
+          if (question.type === "reality_attack") {
+            setIsRealityAttack(true);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch question", e);
     } finally {
       setIsLoading(false);
     }
   }
 
+  // If chat is empty, fetch first question
+  useEffect(() => {
+    if (objective && messages.length === 0 && !isLoading) {
+      fetchNextQuestion([]);
+    }
+  }, [objective, messages.length]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessage: Message = { role: "user" as const, content: input };
-    const newHistory = [...messages, userMessage];
-    setMessages(newHistory);
+    const userText = input.trim();
     setInput("");
-    await saveMessageToDb("user", input);
 
-    if (isRealityAttack) {
-      await fetchNextQuestion(newHistory);
-      return;
+    // 1. Add user message locally and to DB
+    const userMsg: Message = { role: "user", content: userText };
+    setMessages((prev) => [...prev, userMsg]);
+
+    try {
+      const saveRes = await fetch(`/api/decisions/${decisionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userMsg),
+      });
+
+      if (saveRes.ok) {
+        // 2. Fetch assistant reply
+        const updatedHistory = [...messages, userMsg];
+        await fetchNextQuestion(updatedHistory);
+      }
+    } catch (e) {
+      console.error("Failed to save user message", e);
     }
-
-    await fetchNextQuestion(newHistory);
   }
 
-  function handleGenerateReport() {
-    router.push(`/report?id=${decisionId}`);
+  async function handleGenerateReport() {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/decisions/${decisionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (res.ok) {
+        router.push(`/report?id=${decisionId}`);
+      }
+    } catch (e) {
+      console.error("Failed to complete decision", e);
+      setIsLoading(false);
+    }
   }
 
-  const agentPillLabel = !selectedAgents || selectedAgents.length === 0
-    ? "All Challengers"
-    : selectedAgents.length === 1
-    ? AGENT_MAP[selectedAgents[0] as AgentId]?.name ?? "1 Challenger"
-    : `${selectedAgents.length} Challengers`;
+  // Active agents mapping for dropdown UI
+  const activeAgentCount = selectedAgents ? selectedAgents.length : 0;
+  const agentPillLabel = activeAgentCount === 0
+    ? "Matrix Panel (Auto)"
+    : activeAgentCount === 1
+    ? AGENT_MAP[selectedAgents?.[0] as AgentId]?.name ?? "1 Challenger"
+    : `${activeAgentCount} Challengers`;
 
   return (
     <div className={`min-h-screen flex flex-col bg-[#070709] text-zinc-100 relative ${isRealityAttack ? "bg-scanlines" : ""}`}>
@@ -256,7 +279,7 @@ export default function InterviewPage() {
       {isRealityAttack && <div className="pointer-events-none fixed inset-0 z-50 bg-red-500/5 mix-blend-color-burn animate-pulse" />}
 
       {/* Header bar */}
-      <header className={`p-4 border-b ${isRealityAttack ? "border-red-950/80 bg-red-950/20 shadow-[0_0_30px_rgba(239,68,68,0.2)]" : "border-zinc-900 bg-black/40"} backdrop-blur-md sticky top-0 z-20 transition-all`}>
+      <header className={`p-4 border-b ${isRealityAttack ? "border-red-950/80 bg-red-950/20 shadow-[0_0_30px_rgba(239,68,68,0.25)]" : "border-zinc-900 bg-black/40"} backdrop-blur-md sticky top-0 z-20 transition-all`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="p-2 rounded bg-zinc-950 border border-zinc-900 text-zinc-500 hover:text-white hover:border-zinc-800 transition-colors" title="Go Back">
@@ -298,85 +321,102 @@ export default function InterviewPage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Active Nodes</h3>
-            <div className="flex flex-wrap gap-2">
-              {!selectedAgents || selectedAgents.length === 0 ? (
-                <span className="px-2.5 py-1 rounded bg-zinc-900/60 border border-zinc-800 text-[10px] font-mono text-zinc-500">
-                  ALL_CHALLENGERS_ACTIVE
-                </span>
-              ) : (
-                selectedAgents.map((agentId) => {
-                  const agent = AGENT_MAP[agentId as AgentId];
-                  if (!agent) return null;
-                  const styles = COLOR_STYLES[agent.color] || { text: "text-zinc-400", bg: "bg-zinc-900", border: "border-zinc-800" };
-                  return (
-                    <span
-                      key={agentId}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-[10px] font-bold uppercase tracking-wider font-mono ${styles.text} ${styles.bg} ${styles.border}`}
-                    >
-                      {agent.name}
-                    </span>
-                  );
-                })
-              )}
+            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest font-mono">Active Challenge Nodes</h3>
+            <div className="space-y-2">
+              {AGENTS.map((agent) => {
+                const isNodeActive = !selectedAgents || selectedAgents.length === 0 || selectedAgents.includes(agent.id);
+                const colors = COLOR_STYLES[agent.color] || { text: "text-zinc-500", bg: "bg-zinc-900/50", border: "border-zinc-800" };
+                const Icon = ICON_MAP[agent.icon];
+
+                return (
+                  <div
+                    key={agent.id}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg border text-xs transition-all duration-300 ${
+                      isNodeActive
+                        ? `${colors.text} ${colors.bg} ${colors.border}`
+                        : "text-zinc-700 bg-zinc-950/10 border-zinc-900/40 opacity-40"
+                    }`}
+                  >
+                    <div className="p-1 rounded bg-black/40 border border-current/10">
+                      {Icon && <Icon className="size-3.5" />}
+                    </div>
+                    <div className="font-semibold uppercase tracking-wider">{agent.name}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </aside>
 
-        {/* Main Feed Console Area */}
-        <main className="flex-1 flex flex-col relative min-h-0 bg-black/5">
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 pb-40">
-            {messages.map((msg, idx) => {
-              const isUser = msg.role === "user";
-              const isAttack = msg.type === "reality_attack";
-              
-              // Get persona details for styled header
-              const matchedAgent = AGENTS.find(a => a.name === msg.persona);
-              const styles = matchedAgent ? COLOR_STYLES[matchedAgent.color] : null;
+        {/* Right Chat Terminal Pane */}
+        <main className="flex-1 flex flex-col relative overflow-hidden bg-black/5">
+          {/* Scrollable logs */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
+            {messages.length === 0 && isLoading ? (
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-500">
+                <Loader2 className="size-5 animate-spin" />
+                <span className="text-[10px] font-mono uppercase tracking-widest">Warming adversary engines...</span>
+              </div>
+            ) : (
+              <div className="space-y-6 max-w-3xl mx-auto pb-32">
+                {messages.map((msg, i) => {
+                  const isUser = msg.role === "user";
+                  const agentColor = !isUser && msg.persona
+                    ? AGENTS.find((a) => a.name === msg.persona)?.color ?? "red"
+                    : "zinc";
+                  const colors = COLOR_STYLES[agentColor] || { text: "text-zinc-400", bg: "bg-zinc-950/40", border: "border-zinc-900" };
 
-              return (
-                <div key={idx} className={`flex flex-col ${isUser ? "items-end" : "items-start"} max-w-3xl ${isUser ? "ml-auto" : "mr-auto"} w-full`}>
-                  {!isUser && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[10px] font-bold uppercase tracking-widest font-mono ${isAttack ? "text-red-500" : styles?.text ?? "text-zinc-500"}`}>
-                        [NODE_CHALLENGER: {msg.persona}]
-                      </span>
-                      <span className={`size-1.5 rounded-full ${isAttack ? "bg-red-500" : styles?.dot ?? "bg-zinc-500"} animate-pulse`} />
+                  return (
+                    <div
+                      key={i}
+                      className={`flex flex-col gap-1.5 ${isUser ? "items-end" : "items-start"}`}
+                    >
+                      {/* Meta header */}
+                      <div className="flex items-center gap-2 px-1 text-[9px] font-bold tracking-widest uppercase font-mono text-zinc-500">
+                        {isUser ? (
+                          <>
+                            <span>STRATEGIST</span>
+                            <span className="size-1 rounded-full bg-zinc-700" />
+                          </>
+                        ) : (
+                          <>
+                            <span className={colors.text}>{msg.persona || "SYSTEM"}</span>
+                            {msg.type === "reality_attack" && (
+                              <span className="text-red-500 animate-pulse font-bold">[CRISIS EVENT]</span>
+                            )}
+                            <span className="size-1 rounded-full bg-zinc-700" />
+                          </>
+                        )}
+                      </div>
+
+                      {/* Msg bubble */}
+                      <div
+                        className={`max-w-[85%] rounded-2xl p-4 text-[13.5px] leading-relaxed border transition-all duration-300 ${
+                          isUser
+                            ? "bg-zinc-900/60 border-zinc-800 text-white font-sans rounded-br-none"
+                            : msg.type === "reality_attack"
+                            ? "bg-red-950/20 border-red-900/40 text-red-100 font-sans rounded-bl-none shadow-[0_0_20px_rgba(239,68,68,0.05)]"
+                            : `${colors.bg} ${colors.border} text-zinc-200 font-sans rounded-bl-none`
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
                     </div>
-                  )}
-                  
-                  <div
-                    className={`p-5 rounded-xl text-sm leading-relaxed border relative shadow-md transition-all ${
-                      isUser
-                        ? "bg-[#14141b] border-zinc-800/80 text-zinc-100 rounded-tr-sm"
-                        : isAttack
-                        ? "bg-red-950/20 border-red-500/30 text-red-200 rounded-tl-sm shadow-[0_0_25px_rgba(239,68,68,0.06)]"
-                        : `${styles?.bg ?? "bg-zinc-950/60"} ${styles?.border ?? "border-zinc-900"} text-zinc-300 rounded-tl-sm`
-                    }`}
-                  >
-                    {isAttack && (
-                      <div className="absolute top-0 right-0 p-2 text-[9px] text-red-500 font-mono tracking-widest font-bold">EVENT_SIMULATION</div>
-                    )}
-                    <p className="whitespace-pre-wrap leading-relaxed font-sans">{msg.content}</p>
+                  );
+                })}
+
+                {isLoading && (
+                  <div className="flex items-center gap-2.5 text-zinc-500 pl-1">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest">TRANSMITTING ADVERSARIAL QUERY...</span>
                   </div>
-                </div>
-              );
-            })}
-            
-            {isLoading && (
-              <div className="flex flex-col items-start w-full">
-                <span className="text-[10px] font-bold uppercase tracking-widest mb-2 text-zinc-600 font-mono animate-pulse">
-                  CRITICAL_ENGINE: CHALLENGING LOGIC FEED...
-                </span>
-                <div className="bg-[#0b0b11]/30 border border-zinc-900/60 p-5 rounded-xl rounded-tl-sm glass-panel">
-                  <Loader2 className="size-4 animate-spin text-zinc-500" />
-                </div>
+                )}
+                <div ref={endOfMessagesRef} />
               </div>
             )}
-            <div ref={endOfMessagesRef} />
           </div>
 
-          {/* Bottom input area */}
+          {/* Fixed bottom input bar */}
           <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black via-[#070709]/95 to-transparent pt-10 z-10">
             <div className="max-w-3xl mx-auto">
               <form onSubmit={handleSubmit}>
@@ -459,9 +499,9 @@ export default function InterviewPage() {
                           {selectedAgents && selectedAgents.length > 0 && (
                             <div className="px-3 py-2 bg-zinc-950/40 border-t border-zinc-900">
                               <button
-                                type="button"
-                                onClick={() => setSelectedAgents(null)}
-                                className="text-[10px] font-bold text-red-400 hover:text-red-300 font-mono uppercase tracking-wider"
+                                  type="button"
+                                  onClick={() => setSelectedAgents(null)}
+                                  className="text-[10px] font-bold text-red-400 hover:text-red-300 font-mono uppercase tracking-wider"
                               >
                                 &gt; Reset active nodes
                               </button>
@@ -504,5 +544,20 @@ export default function InterviewPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function InterviewPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#070709] text-zinc-100 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="size-8 animate-spin text-zinc-500" />
+          <p className="text-xs font-mono uppercase text-zinc-500">Warming adversary engines...</p>
+        </div>
+      </div>
+    }>
+      <InterviewContent />
+    </Suspense>
   );
 }

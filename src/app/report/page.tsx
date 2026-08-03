@@ -15,7 +15,9 @@ type ReportData = {
   recommendations: string[];
 };
 
-export default function ReportPage() {
+import { Suspense } from "react";
+
+function ReportContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [report, setReport] = useState<ReportData | null>(null);
@@ -204,5 +206,19 @@ export default function ReportPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ReportPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+        <Loader2 className="size-10 animate-spin text-red-500 mb-6" />
+        <h2 className="text-xl font-bold uppercase tracking-widest text-zinc-300">Synthesizing Crucible Results</h2>
+        <p className="mt-2 text-zinc-500 font-mono text-sm">Compiling expert analysis and failure scenarios...</p>
+      </div>
+    }>
+      <ReportContent />
+    </Suspense>
   );
 }
