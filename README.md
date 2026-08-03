@@ -88,5 +88,6 @@ prisma                   Prisma schema
 ## Notes for maintainers
 
 - API route inputs should be normalized through `src/lib/validation.ts` before use.
+- `npm test` includes a guard against unresolved merge conflict markers, so run it after rebases or conflict resolutions.
 - Generated `.next` output is ignored by ESLint; run `npm run lint` from a clean checkout or after builds.
 - If a production build logs `API key should be set when using the Gemini API`, that is an environment warning from the Gemini client. Runtime AI calls still require a valid `GEMINI_API_KEY`.
